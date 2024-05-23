@@ -1,0 +1,179 @@
+###############################
+# NAGIOS DEPENDENCIES
+###############################
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - autoconf
+      - gcc
+      - libc6
+      - make
+      - wget
+      - unzip
+      - apache2
+      - apache2-utils
+      - php
+      - libgd-dev
+      - libmcrypt-dev
+      - libssl-dev
+      - bc
+      - gawk
+      - dc
+      - build-essential
+      - snmp
+      - libnet-snmp-perl
+      - gettext
+    state: present
+
+#################################
+# CREATE NAGIOS USER / GROUP
+#################################
+- name: Create 'nagios' user
+  ansible.builtin.user:
+    name: nagios
+    shell: /bin/bash
+    createhome: true
+
+- name: Create 'nagcmd' group
+  ansible.builtin.group:
+    name: nagcmd
+
+- name: Add 'nagios' user to 'nagcmd' group
+  ansible.builtin.user:
+    name: nagios
+    groups: nagcmd
+    append: true
+
+- name: Add 'www-data' user to 'nagcmd' group
+  ansible.builtin.user:
+    name: www-data
+    groups: nagcmd
+    append: true
+
+##################################
+# DOWNLOAD NAGIOS SOURCE
+##################################
+- name: Download Nagios Core source code
+  ansible.builtin.get_url:
+    url: "{{ nagios_src_url }}"
+    dest: "/tmp/nagios-{{ nagios_version }}.tar.gz"
+    validate_certs: true
+    mode: '0644'
+
+##################################
+# NAGIOS EXTRACTION
+##################################
+- name: Extract Nagios Core source code
+  ansible.builtin.unarchive:
+    src: "/tmp/nagios-{{ nagios_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: true
+    creates: "{{ nagios_src_dir }}"
+
+#####################################
+# COMPILE AND INSTALL
+#####################################
+- name: Compile and install Nagios Core
+  ansible.builtin.shell:
+    cmd: |
+      cd {{ nagios_src_dir }}
+      ./configure --with-httpd-conf=/etc/apache2/sites-enabled
+      make all
+      make install
+      make install-init
+      make install-commandmode
+      make install-config
+  args:
+    creates: "/usr/local/nagios/bin/nagios"
+
+- name: Install additional SSL libraries
+  ansible.builtin.apt:
+    name: libssl-dev
+    state: present
+
+#############################################
+# NAGIOS PLUGINS
+#############################################
+- name: Download Nagios Plugins source code
+  ansible.builtin.get_url:
+    url: "{{ nagios_plugins_url }}"
+    dest: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+    validate_certs: true
+    mode: '0644'
+
+- name: Extract Nagios Plugins source code
+  ansible.builtin.unarchive:
+    src: "/tmp/nagios-plugins-{{ nagios_plugins_version }}.tar.gz"
+    dest: "/tmp"
+    remote_src: true
+    creates: "{{ nagios_plugins_src_dir }}"
+
+- name: Compile and install Nagios Plugins
+  ansible.builtin.shell:
+    cmd: |
+      cd {{ nagios_plugins_src_dir }}
+      ./configure --with-nagios-user={{ nagios_user }} --with-nagios-group={{ nagios_group }}
+      make
+      make install
+  args:
+    creates: "/usr/local/nagios/libexec/check_disk"
+
+- name: Create htpasswd entry for Nagios web interface
+  ansible.builtin.command:
+    cmd: "htpasswd -b -c {{ htpasswd_file }} {{ htpasswd_user }} {{ htpasswd_password }}"
+  changed_when: false
+
+- name: Set permissions on htpasswd file
+  ansible.builtin.file:
+    path: "{{ htpasswd_file }}"
+    owner: "{{ nagios_user }}"
+    group: "{{ nagios_group }}"
+    mode: '0644'
+
+########################################
+# NAGIOS AND APACHE
+########################################
+- name: Copy Nagios Apache configuration from template
+  ansible.builtin.template:
+    src: nagios_apache_config.j2
+    dest: /etc/apache2/sites-available/nagios.conf
+    mode: '0644'
+  notify: Restart Apache
+
+- name: Create symbolic link to enable Nagios site
+  ansible.builtin.file:
+    src: "{{ apache_nagios_conf_path }}"
+    dest: "{{ nagios_sites_enabled }}/nagios.conf"
+    state: link
+  notify: Restart Apache
+
+- name: Enable Apache modules for Nagios
+  ansible.builtin.command:
+    cmd: "a2enmod rewrite cgi"
+  args:
+    creates: "{{ apache_modules_path }}/rewrite.load"
+  notify: Restart Apache
+
+- name: Modify nagios.cfg to enable additional configurations
+  ansible.builtin.lineinfile:
+    path: "{{ nagios_cfg_path }}"
+    regexp: "^#cfg_dir=/usr/local/nagios/etc/servers"
+    line: "cfg_dir={{ nagios_cfg_dir }}"
+    state: present
+
+- name: Create directory for Nagios server configurations
+  ansible.builtin.file:
+    path: "{{ nagios_cfg_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Verify Nagios configuration
+  ansible.builtin.command:
+    cmd: "/usr/local/nagios/bin/nagios -v {{ nagios_cfg_path }}"
+  changed_when: false
+
+- name: Restart Nagios if configuration is valid
+  ansible.builtin.service:
+    name: nagios
+    state: restarted
+  notify: Restart Apache

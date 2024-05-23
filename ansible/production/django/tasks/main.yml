@@ -1,0 +1,85 @@
+---
+- name: Update apt cache and install dependencies
+  apt:
+    update_cache: yes
+    name:
+      - python3
+      - python3-venv
+      - python3-pip
+      - libpq-dev
+      - nginx
+      - git
+    state: present
+
+- name: Create a directory for the Django app
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+
+- name: Create a virtual environment
+  command: python3 -m venv {{ venv_dir }}
+  args:
+    creates: "{{ venv_dir }}/bin/activate"
+
+- name: Install Gunicorn
+  pip:
+    name: gunicorn
+    virtualenv: "{{ venv_dir }}"
+
+# - name: Create systemd socket for Gunicorn
+#  template:
+#    src: gunicorn.socket.j2
+#    dest: /etc/systemd/system/gunicorn.socket   
+
+- name: Create systemd service for Gunicorn
+  template:
+    src: gunicorn.service.j2
+    dest: /etc/systemd/system/gunicorn.service
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes    
+
+# - name: Enable and start Gunicorn service
+#  systemd:
+#    name: gunicorn
+#    enabled: yes
+#    state: started
+
+# - name: Start and enable gunicorn.socket
+#  systemd:
+#    name: gunicorn.socket
+#    enabled: yes
+#    state: started
+
+- name: Disable Default Config
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Configure Nginx
+  ansible.builtin.template:
+    src: nginx_django.j2
+    dest: /etc/nginx/sites-available/django
+
+- name: Enable Nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/django
+    dest: /etc/nginx/sites-enabled/django
+    state: link
+
+- name: Uncomment server_names_hash_bucket_size in nginx configuration
+  ansible.builtin.replace:
+    path: /etc/nginx/nginx.conf
+    regexp: '^\s*#\s*server_names_hash_bucket_size\s+64;$'
+    replace: 'server_names_hash_bucket_size 128;'
+
+- name: Allow NGINX Full
+  ansible.builtin.ufw:
+    rule: allow
+    name: 'Nginx Full'
+
+- name: Reload NGINX
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded

@@ -1,0 +1,122 @@
+- name: Download SonarQube ZIP file
+  ansible.builtin.get_url:
+    url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.0.65466.zip"
+    dest: "/tmp/sonarqube-9.9.0.65466.zip"
+    mode: '0644'
+
+- name: Ensure unzip is installed
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+    update_cache: true
+
+- name: Unzip SonarQube
+  ansible.builtin.unarchive:
+    src: "/tmp/sonarqube-9.9.0.65466.zip"
+    dest: "/opt"
+    remote_src: true
+    creates: "/opt/sonarqube-9.9.0.65466"
+
+- name: Ensure /opt/sonarqube is removed
+  ansible.builtin.file:
+    path: /opt/sonarqube
+    state: absent
+
+- name: Move unzipped SonarQube to /opt/sonarqube
+  ansible.builtin.command: mv /opt/sonarqube-9.9.0.65466 /opt/sonarqube
+  args:
+    creates: /opt/sonarqube
+
+- name: Create 'sonar' group for SonarQube
+  ansible.builtin.group:
+    name: sonar
+    state: present
+
+- name: Create 'sonar' user with specified home directory and group
+  ansible.builtin.user:
+    name: sonar
+    comment: "user to run SonarQube"
+    home: "/opt/sonarqube"
+    group: sonar
+    state: present
+
+- name: Set password for the sonar system user
+  ansible.builtin.user:
+    name: sonar
+    password: "$6$rounds=10000$salt$2svJXxEYpeGnxdnN/PR4R6F.pBMp3qXk66NSKTIsJoN3JXQw3qyFLaR7Z/b9KXx4JLKuNkMDoyEnM5vSlj8LT/"
+    update_password: always
+
+- name: Change ownership of /opt/sonarqube to 'sonar' user and group
+  ansible.builtin.file:
+    path: "/opt/sonarqube"
+    owner: sonar
+    group: sonar
+    recurse: true
+
+#########################################
+# SONARQUBE CONFIGURATION
+#########################################
+
+- name: Ensure sonar.jdbc.username is set
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regexp: '^#sonar.jdbc.username='
+    line: 'sonar.jdbc.username=sonar'
+    state: present
+    backrefs: true
+
+- name: Ensure sonar.jdbc.password is set
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regexp: '^#sonar.jdbc.password='
+    line: 'sonar.jdbc.password=sonar'
+    state: present
+
+- name: Set the correct JDBC URL
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube/conf/sonar.properties
+    regexp: '^#sonar.jdbc.url='
+    line: 'sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube'
+    state: present
+
+- name: Copy SonarQube systemd service file
+  ansible.builtin.copy:
+    src: "sonarqube.service"
+    dest: "/etc/systemd/system/sonarqube.service"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Start SonarQube service
+  ansible.builtin.systemd:
+    name: sonarqube
+    state: started
+    enabled: true
+
+- name: Ensure the SonarQube backup directory exists
+  ansible.builtin.file:
+    path: "/opt/sonarqube/backup"
+    state: directory
+    owner: sonar
+    group: sonar
+    mode: '0755'
+
+- name: Create the Postgresql backup script
+  ansible.builtin.template:
+    src: "sonarqube_backup.j2"
+    dest: "/opt/sonarqube/backup/sonarqube_backup.sh"
+    owner: sonar
+    group: sonar
+    mode: '0755'
+
+- name: Create the Postgresql restore script
+  ansible.builtin.template:
+    src: "sonarqube_restore.j2"
+    dest: "/opt/sonarqube/backup/sonarqube_restore.sh"
+    owner: sonar
+    group: sonar
+    mode: '0755'

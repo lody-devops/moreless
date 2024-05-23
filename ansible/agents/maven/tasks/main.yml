@@ -1,0 +1,6 @@
+- name: Install maven & jdk
+  ansible.builtin.apt:
+    name:
+      - openjdk-17-jdk
+      - maven
+    state: present

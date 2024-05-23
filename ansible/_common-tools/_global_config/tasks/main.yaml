@@ -1,0 +1,82 @@
+- name: Update package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set TimeZone
+  community.general.timezone:
+    name: Europe/Brussels
+
+- name: Create a new user
+  ansible.builtin.user:
+    name: jenkins
+    shell: /bin/bash
+    create_home: true
+    password: "{{ 'jenkins' | password_hash('sha512') }}"
+  become: true
+
+- name: Create working directory for Jenkins
+  ansible.builtin.file:
+    path: /home/jenkins/workingdir
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+  become: true
+
+- name: Ensure .ssh folder exists
+  ansible.builtin.file:
+    path: /home/jenkins/.ssh
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
+  become: true
+
+- name: Ensure authorized_keys file exists
+  ansible.builtin.file:
+    path: /home/jenkins/.ssh/authorized_keys
+    state: touch
+    owner: jenkins
+    group: jenkins
+    mode: "0644"
+  become: true
+
+- name: Install git
+  ansible.builtin.apt:
+    name: git
+    state: present
+
+- name: Install Acl
+  ansible.builtin.apt:
+    name: acl
+    state: present
+
+- name: Install Python Required Lib (for sonarqube)
+  ansible.builtin.apt:
+    name: python3-psycopg2
+    state: present
+
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  become: true
+
+- name: Allow SSH connections on port 22
+  community.general.ufw:
+    rule: allow
+    port: 22
+    proto: tcp
+    comment: 'Allow SSH'
+
+- name: Allow SSH connections on port 9000
+  community.general.ufw:
+    rule: allow
+    port: 9000
+    proto: tcp
+    comment: 'Allow SonarQube Web'
+
+- name: Enable firewall ufw
+  community.general.ufw:
+    state: enabled

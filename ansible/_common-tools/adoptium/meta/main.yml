@@ -1,0 +1,14 @@
+galaxy_info:
+  author: LoDy
+  description: Install Adoptium
+  company: N/A
+  license: MIT
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - bionic
+  galaxy_tags:
+    - adoptium
+    - java

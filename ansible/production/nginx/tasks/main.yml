@@ -1,0 +1,42 @@
+##############################
+#  Configure API
+##############################
+
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: latest
+
+- name: Edit nginx default conf
+  ansible.builtin.template:
+    src: morelessapi_nginx.conf.j2
+    dest: /etc/nginx/sites-enabled/default
+    force: yes
+
+- name: Create /var/www/api 
+  ansible.builtin.file:
+    path: /var/www/api
+    state: directory  
+    owner: www-data   
+    group: www-data   
+    mode: '0755'   
+
+##############################
+#   install ufw
+##############################
+
+- name: Install ufw 
+  ansible.builtin.shell: apt-get install ufw -y 
+
+- name: Allow SSH connections on port 22
+  ansible.builtin.shell: ufw allow 22/tcp comment 'Allow SSH'
+
+- name: Allow HTTP connections on port 3306
+  ansible.builtin.shell: ufw allow 3306/tcp comment 'Allow Mysql'
+
+- name: Allow HTTP connections on port 80
+  ansible.builtin.shell: ufw allow 80/tcp comment 'Allow Web for Api'  
+
+- name:  Enabled firewall ufw
+  ansible.builtin.shell: ufw --force enable
+  

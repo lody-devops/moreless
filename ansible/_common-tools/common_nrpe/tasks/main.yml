@@ -1,0 +1,142 @@
+ ##############################
+ #   udpate ubuntu
+ ##############################
+- name: "Apt-get update -y"
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Set TimeZone
+  community.general.timezone:
+    name: Europe/Brussels
+###############################
+# NAGIOS DEPEDENCIES
+###############################
+- name: Install packages
+  ansible.builtin.apt:
+    name:
+      - libssl-dev
+      - build-essential
+      - unzip
+      - tar
+    state: present
+
+##################################
+# NAGIOS DOWNLOAD & COMPILE CLIENT
+##################################
+
+- name: Create the Downloads directory if it doesn't exist
+  ansible.builtin.file:
+    path: "{{ download_dir }}"
+    state: directory
+    mode: '0777'
+    owner: root
+    group: root
+
+- name: Download the Nagios Plugins tarball
+  ansible.builtin.get_url:
+    url: "https://nagios-plugins.org/download/nagios-plugins-2.4.10.tar.gz"
+    dest: "{{ download_dir }}/nagios-plugins-2.4.10.tar.gz"
+    mode: '0777'
+    owner: root
+    group: root
+
+- name: Extract the Nagios Plugins tarball
+  ansible.builtin.unarchive:
+    src: "{{ download_dir }}/nagios-plugins-2.4.10.tar.gz"
+    dest: "{{ download_dir }}"
+    remote_src: true
+
+- name: Compile and install the Nagios Plugins
+  ansible.builtin.shell:
+    cmd: |
+      ./configure
+      make
+      make install
+  args:
+    chdir: "{{ download_dir }}/nagios-plugins-2.4.10"
+    creates: /usr/local/nagios/libexec/check_http
+
+- name: Create Nagios group
+  ansible.builtin.group:
+    name: nagios
+    state: present
+
+- name: Create Nagios user and add to Nagios group
+  ansible.builtin.user:
+    name: nagios
+    groups: nagios
+    append: true
+
+- name: Change ownership of Nagios directory
+  ansible.builtin.file:
+    path: /usr/local/nagios
+    owner: nagios
+    group: nagios
+    mode: '0755'
+    state: directory
+
+- name: Change ownership of Nagios libexec directory recursively
+  ansible.builtin.file:
+    path: /usr/local/nagios/libexec
+    owner: nagios
+    group: nagios
+    mode: '0755'
+    state: directory
+    recurse: true
+
+##################################
+# NRPE DOWNLOAD & INSTALLATION
+##################################
+- name: Download the NRPE tarball
+  ansible.builtin.get_url:
+    url: "https://github.com/NagiosEnterprises/nrpe/releases/download/nrpe-{{ nrpe_version }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "{{ download_dir }}/nrpe-{{ nrpe_version }}.tar.gz"
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Extract the NRPE tarball
+  ansible.builtin.unarchive:
+    src: "{{ download_dir }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "{{ download_dir }}"
+    owner: nagios
+    group: nagios
+    mode: '0755'
+    remote_src: true
+
+- name: Compile and install NRPE
+  ansible.builtin.shell:
+    cmd: |
+      ./configure &&
+      make all &&
+      sudo make install-groups-users &&
+      sudo make install &&
+      sudo make install-inetd &&
+      sudo make install-init
+  args:
+    chdir: "{{ download_dir }}/nrpe-{{ nrpe_version }}"
+    creates: /usr/local/nagios/bin/nrpe
+
+- name: Create /etc/nrpe directory
+  ansible.builtin.file:
+    path: /usr/local/nagios/etc
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: '0755'
+
+- name: Ensure allowed_hosts line is in the file
+  ansible.builtin.lineinfile:
+    path: /usr/local/nagios/etc/nrpe.cfg
+    line: "allowed_hosts=127.0.0.1,10.1.6.4"
+    owner: nagios
+    group: nagios
+    mode: '0755'
+    create: true
+
+- name: Enable and start the NRPE service
+  ansible.builtin.systemd:
+    name: nrpe
+    enabled: true
+    state: started

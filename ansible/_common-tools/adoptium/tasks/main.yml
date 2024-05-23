@@ -1,0 +1,29 @@
+# roles/your_role/tasks/main.yml
+
+- name: Ensure apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Adoptium GPG Key
+  ansible.builtin.get_url:
+    url: "https://packages.adoptium.net/artifactory/api/gpg/key/public"
+    dest: "/etc/apt/keyrings/adoptium.asc"
+    mode: '0644'
+
+- name: Add AdoptOpenJDK APT Repository
+  ansible.builtin.shell: >
+    set -o pipefail; echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc]
+    https://packages.adoptium.net/artifactory/deb
+    $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | tee /etc/apt/sources.list.d/adoptium.list
+  args:
+    executable: /bin/bash
+  no_log: true
+  changed_when: false
+  register: repo_updated
+
+- name: Install Java Temurin
+  ansible.builtin.apt:
+    name: temurin-17-jdk
+    state: present

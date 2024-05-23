@@ -1,0 +1,56 @@
+##############################
+#   install Jmeter
+##############################
+- name: Download Apache JMeter
+  ansible.builtin.get_url:
+    url: https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz
+    dest: /tmp/apache-jmeter-5.6.3.tgz
+    mode: '0644'
+
+- name: Extract to /tmp
+  ansible.builtin.unarchive:
+    src: /tmp/apache-jmeter-5.6.3.tgz
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/apache-jmeter-5.6.3
+
+- name: Move extracted directory to /var/lib/apache-jmeter
+  ansible.builtin.command:
+    cmd: mv /tmp/apache-jmeter-5.6.3 /var/lib/apache-jmeter
+  args:
+    creates: /var/lib/apache-jmeter
+
+- name: Ensure the /var/lib/apache-jmeter/bin/user.properties file exists
+  ansible.builtin.file:
+    path: /var/lib/apache-jmeter/bin/user.properties
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add a custom line to user.properties
+  ansible.builtin.lineinfile:
+    path: /var/lib/apache-jmeter/bin/user.properties
+    line: "jmeter.save.saveservice.output_format=xml"
+    insertbefore: EOF
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Append JMETER_HOME to /etc/profile
+  ansible.builtin.lineinfile:
+    path: /etc/profile
+    line: "export JMETER_HOME=/var/lib/apache-jmeter/bin/"
+    insertbefore: EOF
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Append JMETER_HOME/bin to PATH in /etc/profile
+  ansible.builtin.lineinfile:
+    path: /etc/profile
+    line: "export PATH=$JMETER_HOME:$PATH"
+    insertbefore: EOF
+    owner: root
+    group: root
+    mode: '0644'

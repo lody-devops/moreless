@@ -1,0 +1,33 @@
+##################################
+# NRPE DOWNLOAD & INSTALLATION
+##################################
+- name: Create the Downloads directory if it doesn't exist
+  ansible.builtin.file:
+    path: "{{ download_dir }}"
+    state: directory
+    mode: '0755'
+  tags: nrpe
+
+- name: Download the NRPE tarball
+  ansible.builtin.get_url:
+    url: "https://github.com/NagiosEnterprises/nrpe/releases/download/nrpe-{{ nrpe_version }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "{{ download_dir }}/nrpe-{{ nrpe_version }}.tar.gz"
+    mode: '0644'
+  tags: nrpe
+
+- name: Extract the NRPE tarball
+  ansible.builtin.unarchive:
+    src: "{{ download_dir }}/nrpe-{{ nrpe_version }}.tar.gz"
+    dest: "{{ download_dir }}"
+    remote_src: true
+  tags: nrpe
+
+- name: Compile and install NRPE
+  ansible.builtin.command:
+    cmd: ./configure && make check_nrpe && make install-plugin
+    chdir: "{{ download_dir }}/nrpe-{{ nrpe_version }}"
+  args:
+    warn: false
+  register: compile_install_nrpe
+  changed_when: "'NRPE Plugin installed successfully' in compile_install_nrpe.stdout"
+  tags: nrpe

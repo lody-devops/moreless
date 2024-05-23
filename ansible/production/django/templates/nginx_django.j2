@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    server_name {{ allowed_host }};
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location /static/ {
+        root {{ static_route }};
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+    }
+}

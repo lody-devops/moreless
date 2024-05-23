@@ -1,0 +1,8 @@
+- name: Playbook for Quality Control Server
+  hosts: monitoring
+  become: true
+  roles:
+    - nagios
+    - common_nrpe_server
+    - prometheus
+    - grafana

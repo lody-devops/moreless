@@ -1,0 +1,48 @@
+##############################
+#   install java runtinme
+##############################
+- name: Install Java JRE
+  ansible.builtin.apt:
+    name:
+      - default-jre
+      - openjdk-17-jdk
+    state: present
+
+##############################
+#   Prepare API environment
+##############################
+- name: Create the finale api directory
+  ansible.builtin.file:
+    path: /var/www/api/
+    state: directory
+- name: Create the Api service
+  become: true
+  ansible.builtin.template:
+    src: moreless_api.service.j2
+    dest: /etc/systemd/system/moreless_api.service
+- name: Reload systemd to read the new service file
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+- name: Enable and start moreless service
+  ansible.builtin.systemd:
+    name: moreless_api
+    enabled: true
+    state: started 
+
+##############################
+#   install ufw
+##############################
+
+- name: Install ufw
+  ansible.builtin.shell: apt-get install ufw -y
+
+- name: Allow SSH connections on port 22
+  ansible.builtin.shell: ufw allow 22/tcp comment 'Allow SSH'
+
+- name: Allow HTTP connections on port 80
+  ansible.builtin.shell: ufw allow 80/tcp comment 'Allow HTTP API'
+
+- name: Enabled firewall ufw
+  ansible.builtin.shell: ufw --force enable
+  

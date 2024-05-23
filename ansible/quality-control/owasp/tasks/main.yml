@@ -1,0 +1,82 @@
+##############################
+#   install java compiler
+##############################
+- name: Install java sdk
+  ansible.builtin.apt:
+    name: openjdk-17-jdk # Check the version
+    state: present
+
+################################
+# Install ZAP (Owasp)
+################################
+
+- name: Download the OpenSUSE GPG key
+  ansible.builtin.get_url:
+    url: https://download.opensuse.org/repositories/home:cabelo/xUbuntu_22.04/Release.key
+    dest: /tmp/Release.key
+    mode: '0644'
+
+- name: Ensure /tmp/Release.gpg is removed
+  ansible.builtin.file:
+    path: /tmp/Release.gpg
+    state: absent
+
+- name: Convert GPG key to binary format
+  ansible.builtin.command: gpg --dearmor -o /tmp/Release.gpg /tmp/Release.key
+  changed_when: false
+
+- name: Move the key to apt's trusted key directory
+  ansible.builtin.copy:
+    src: /tmp/Release.gpg
+    dest: /etc/apt/trusted.gpg.d/home_cabelo.gpg
+    owner: root
+    group: root
+    mode: '0644'
+    remote_src: true
+
+- name: Clean up temporary files
+  ansible.builtin.file:
+    path: /tmp/Release.key
+    state: absent
+
+- name: Clean up temporary GPG files
+  ansible.builtin.file:
+    path: /tmp/Release.gpg
+    state: absent
+
+- name: Add OWASP ZAP APT repository
+  ansible.builtin.apt_repository:
+    repo: 'deb http://download.opensuse.org/repositories/home:/cabelo/xUbuntu_22.04/ /'
+    state: present
+    filename: 'home_cabelo'
+
+- name: Update APT cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install OWASP ZAP
+  ansible.builtin.apt:
+    name: owasp-zap
+    state: present
+
+##############################
+#   Install OWASP ZAP from Script
+##############################
+- name: Download OWASP ZAP Installer Script
+  ansible.builtin.get_url:
+    url: 'https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2_14_0_unix.sh'
+    dest: '/tmp/ZAP_2_14_0_unix.sh'
+    mode: '0755'
+
+- name: Execute OWASP ZAP Installer Script
+  ansible.builtin.command: '/tmp/ZAP_2_14_0_unix.sh -q'
+  args:
+    creates: '/usr/share/zaproxy'
+
+##############################
+#   Clean Up Temporary Files
+##############################
+- name: Remove OWASP ZAP Installer Script
+  ansible.builtin.file:
+    path: '/tmp/ZAP_2_14_0_unix.sh'
+    state: absent

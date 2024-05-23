@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Backup script for Grafana database
+
+# Backup directory and file name with timestamp
+LATEST_BACKUP_FILE=$(ls -t /tmp/*db | head -n 1)
+
+# Backup the Grafana database
+cp ${LATEST_BACKUP_FILE} /var/lib/grafana/grafana.db
+
+# Output the result
+echo "Grafana Restore Done : ${LATEST_BACKUP_FILE}"

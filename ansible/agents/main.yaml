@@ -1,0 +1,5 @@
+- name: Playbook for deploying java tools
+  hosts: agents-java
+  become: true
+  roles:
+    - maven

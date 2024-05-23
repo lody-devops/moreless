@@ -1,0 +1,150 @@
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Remove all redundant listen directives for port 8666
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/default
+    regexp: '^\\s*listen\\s+8666\\s+default_server.*'
+    state: absent
+
+- name: Apply the desired Nginx configuration template
+  ansible.builtin.template:
+    src: "nginx_config.j2"
+    dest: "/etc/nginx/sites-available/default"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add Prometheus group
+  ansible.builtin.group:
+    name: prometheus
+    state: present
+
+- name: Add Prometheus system user
+  ansible.builtin.user:
+    name: prometheus
+    shell: /sbin/nologin
+    system: true
+    group: prometheus
+
+- name: Create Prometheus directories
+  ansible.builtin.file:
+    path: "/var/lib/prometheus"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+
+- name: Create Prometheus config directories
+  loop:
+    - rules
+    - rules.d
+    - files_sd
+  ansible.builtin.file:
+    path: "/etc/prometheus/{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0775'
+
+- name: Install Curl
+  ansible.builtin.apt:
+    name: curl
+    state: present
+
+- name: Create /tmp/prometheus directory
+  ansible.builtin.file:
+    path: "/tmp/prometheus"
+    state: directory
+    mode: '0755'
+
+- name: Download Prometheus
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v2.52.0-rc.1/prometheus-2.52.0-rc.1.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64.tar.gz"
+    mode: '0644'
+
+- name: Extract Prometheus
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus"
+    remote_src: true
+
+- name: Move Prometheus binaries to /usr/local/bin/
+  ansible.builtin.command:
+    cmd: mv /tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64/prometheus /usr/local/bin/
+  changed_when: false
+
+- name: Move Promtool binary to /usr/local/bin/
+  ansible.builtin.command:
+    cmd: mv /tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64/promtool /usr/local/bin/
+  changed_when: false
+
+- name: Move Prometheus main configuration file
+  ansible.builtin.command:
+    cmd: mv /tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64/prometheus.yml /etc/prometheus/prometheus.yml
+  changed_when: false
+
+- name: Move Prometheus consoles directory
+  ansible.builtin.command:
+    cmd: mv /tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64/consoles /etc/prometheus/
+  changed_when: false
+
+- name: Move Prometheus console libraries directory
+  ansible.builtin.command:
+    cmd: mv /tmp/prometheus/prometheus-2.52.0-rc.1.linux-amd64/console_libraries /etc/prometheus/
+  changed_when: false
+
+- name: Create Prometheus systemd service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/prometheus.service"
+    content: |
+      [Unit]
+      Description=Prometheus
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file /etc/prometheus/prometheus.yml \
+        --storage.tsdb.path /var/lib/prometheus/ \
+        --web.console.templates=/etc/prometheus/consoles \
+        --web.console.libraries=/etc/prometheus/console_libraries
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+
+- name: Reload systemd daemons
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Apply the Prometheus Config
+  ansible.builtin.template:
+    src: "prometheus_config.j2"
+    dest: "/etc/prometheus/prometheus.yml"
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+
+- name: Start and enable Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+
+- name: Allow Nginx Full and Prometheus port in UFW
+  community.general.ufw:
+    rule: allow
+    name: "Nginx Full"
+
+- name: Allow Prometheus port 9090 in UFW
+  community.general.ufw:
+    rule: allow
+    proto: tcp
+    port: 9090

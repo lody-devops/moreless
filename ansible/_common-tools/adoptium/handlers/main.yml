@@ -1,0 +1,6 @@
+- name: Update APT Package Cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Ensure APT Cache is Reloaded
+  ansible.builtin.meta: flush_handlers

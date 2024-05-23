@@ -1,0 +1,87 @@
+##############################
+#   install Postgre
+##############################
+- name: Install wget and ca-certificates
+  ansible.builtin.apt:
+    name:
+      - wget
+      - ca-certificates
+    state: present
+
+- name: Add PostgreSQL repository to sources list
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list.d/pgdg.list
+    line: "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main"
+    create: true
+    mode: '0644'
+
+- name: Add PostgreSQL GPG key to trusted keys
+  ansible.builtin.get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /etc/apt/trusted.gpg.d/pgdg.asc
+    mode: '0644'
+
+- name: Update APT package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+    state: present
+  become: true
+
+- name: Enable PostgreSQL
+  ansible.builtin.systemd:
+    name: postgresql
+    enabled: true
+
+- name: Set password for the postgres system user (Debian/Ubuntu alternative)
+  ansible.builtin.shell: |
+    set -o pipefail; echo "postgres:postgres" | chpasswd
+  args:
+    executable: /bin/bash
+  changed_when: false
+  register: postgres_password_set
+
+- name: Create PostgreSQL user 'sonar'
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: sonar
+    password: sonar
+    encrypted: true
+
+- name: Create 'sonarqube' database with owner 'sonar'
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: sonarqube
+    owner: sonar
+
+- name: Grant all privileges on 'sonarqube' database to 'sonar'
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_query:
+    db: sonarqube
+    query: "GRANT ALL PRIVILEGES ON DATABASE sonarqube TO sonar"
+
+# Prepare Backup
+
+- name: Ensure the .pgpass file exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.pgpass"
+    state: touch
+    mode: '0600'
+
+- name: Write PostgreSQL connection information to .pgpass
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_env.HOME }}/.pgpass"
+    line: "{{ item }}"
+    create: true
+    mode: '0600'
+  with_items:
+    - "localhost:5432:sonarqube:sonar:sonar"
