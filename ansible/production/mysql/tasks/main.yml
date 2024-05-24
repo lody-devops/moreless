@@ -2,19 +2,21 @@
 #   Install MySQL Server
 ##############################
 - name: Install MySQL Server
+  become: true
   ansible.builtin.apt:
-    name: 
-    - mysql-server
-    - mysql-client
-    - python3-pip
+    name:
+      - mysql-server
+      - mysql-client
+      - python3-pip
     state: present
     update_cache: true
 
 ######################################
-# INSTALL MYSQL DEPEDENCIES
-######################################    
+# INSTALL MYSQL DEPENDENCIES
+######################################
 
 - name: Ensure PyMySQL is installed
+  become: true
   ansible.builtin.pip:
     name: PyMySQL
     state: present
@@ -22,32 +24,30 @@
 ##############################
 #   Ensure MySQL is Running
 ##############################
-- name: Ensure mysql is running and starts on boot
-  service:
+- name: Ensure MySQL is running and starts on boot
+  become: true
+  ansible.builtin.service:
     name: mysql
     state: started
     enabled: true
 
-- name: Update mysql password for superuser `{{ mysql_superuser }}`
-  mysql_user:
-    # Update the superuser to have all grants and a password
+- name: Update MySQL password for superuser `{{ mysql_superuser }}`
+  become: true
+  community.mysql.mysql_user:
     name: "{{ mysql_superuser }}"
     host: localhost
     password: "{{ mysql_superuser_password }}"
     priv: "*.*:ALL,GRANT"
-    # Login *as root* to perform this change, even though you might
-    # be altering the root user itself
     login_user: root
     login_password: ""
     login_port: "{{ mysql_port }}"
     login_host: localhost
     login_unix_socket: "{{ mysql_socket }}"
-    # As a good measure,have ansible check whether an implicit login
-    # is possible first
     check_implicit_admin: true
 
 - name: Add user to access "moreless" database
-  mysql_user:
+  become: true
+  community.mysql.mysql_user:
     name: "{{ mysql_moreless_user }}"
     host: localhost
     password: "{{ mysql_moreless_password }}"
@@ -57,17 +57,29 @@
     login_port: "{{ mysql_port }}"
     login_host: localhost
     login_unix_socket: "{{ mysql_socket }}"
-    check_implicit_admin: yes    
+    check_implicit_admin: true
 
-- name: Create system-wide mysql configuration file
+- name: Create system-wide MySQL configuration file
+  become: true
   ansible.builtin.template:
     src: system_wide_mysql.cnf.j2
     dest: /etc/my.cnf
+    mode: '0644'
 
-- name: Create mysql configuration file for `{{ mysql_superuser }}`
+- name: Create MySQL configuration file for `{{ mysql_superuser }}`
+  become: true
   ansible.builtin.template:
     src: root.my.cnf.j2
     dest: "{{ mysql_superuser_home }}/.my.cnf"
+    mode: '0600'
   notify:
-  - Restart Mysql
-  
+    - Restart MySQL
+
+##############################
+# Handlers
+##############################
+- name: Restart MySQL
+  become: true
+  ansible.builtin.service:
+    name: mysql
+    state: restarted

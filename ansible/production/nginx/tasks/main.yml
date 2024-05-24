@@ -3,40 +3,67 @@
 ##############################
 
 - name: Install Nginx
+  become: true
   ansible.builtin.apt:
     name: nginx
-    state: latest
+    state: present
 
-- name: Edit nginx default conf
+- name: Edit Nginx default conf
+  become: true
   ansible.builtin.template:
     src: morelessapi_nginx.conf.j2
     dest: /etc/nginx/sites-enabled/default
-    force: yes
+    force: true
+    owner: root
+    group: root
+    mode: '0644'
 
-- name: Create /var/www/api 
+- name: Create /var/www/api
+  become: true
   ansible.builtin.file:
     path: /var/www/api
-    state: directory  
-    owner: www-data   
-    group: www-data   
-    mode: '0755'   
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
 
 ##############################
-#   install ufw
+#   Install ufw
 ##############################
 
-- name: Install ufw 
-  ansible.builtin.shell: apt-get install ufw -y 
+- name: Install ufw
+  become: true
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
 
 - name: Allow SSH connections on port 22
-  ansible.builtin.shell: ufw allow 22/tcp comment 'Allow SSH'
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    comment: 'Allow SSH'
 
-- name: Allow HTTP connections on port 3306
-  ansible.builtin.shell: ufw allow 3306/tcp comment 'Allow Mysql'
+- name: Allow MySQL connections on port 3306
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '3306'
+    proto: tcp
+    comment: 'Allow MySQL'
 
 - name: Allow HTTP connections on port 80
-  ansible.builtin.shell: ufw allow 80/tcp comment 'Allow Web for Api'  
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'Allow Web for API'
 
-- name:  Enabled firewall ufw
-  ansible.builtin.shell: ufw --force enable
-  
+- name: Enable firewall ufw
+  become: true
+  community.general.ufw:
+    state: enabled
+    policy: allow

@@ -1,12 +1,12 @@
 - name: Playbook for WebApplication
   hosts: node-web
-  become: yes
+  become: true
   roles:
     - django
 
 - name: Playbook for Databases
   hosts: node-db
-  become: yes
+  become: true
   roles:
     - nginx
     - mysql

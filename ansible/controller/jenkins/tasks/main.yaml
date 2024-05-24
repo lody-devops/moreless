@@ -42,9 +42,6 @@
     mode: '0700'
     recurse: true
 
-- name: Add GitHub to known_hosts for Jenkins
-  ansible.builtin.known_hosts:
-    name: github.com
-    path: /var/lib/jenkins/.ssh/known_hosts
-  become: true
-  become_user: jenkins
+- name: Fetch GitHub SSH host key fingerprint
+  ansible.builtin.shell:
+    cmd: ssh-keyscan -H github.com >> /var/lib/jenkins/.ssh/known_hosts

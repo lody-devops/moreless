@@ -1,7 +1,8 @@
 ##############################
-#   install java runtinme
+#   install java runtime
 ##############################
 - name: Install Java JRE
+  become: true
   ansible.builtin.apt:
     name:
       - default-jre
@@ -12,37 +13,59 @@
 #   Prepare API environment
 ##############################
 - name: Create the finale api directory
+  become: true
   ansible.builtin.file:
     path: /var/www/api/
     state: directory
+    mode: '0755'
+
 - name: Create the Api service
   become: true
   ansible.builtin.template:
     src: moreless_api.service.j2
     dest: /etc/systemd/system/moreless_api.service
+    mode: '0644'
+
 - name: Reload systemd to read the new service file
   become: true
   ansible.builtin.systemd:
     daemon_reload: true
+
 - name: Enable and start moreless service
+  become: true
   ansible.builtin.systemd:
     name: moreless_api
     enabled: true
-    state: started 
+    state: started
 
 ##############################
 #   install ufw
 ##############################
-
 - name: Install ufw
-  ansible.builtin.shell: apt-get install ufw -y
+  become: true
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
 
 - name: Allow SSH connections on port 22
-  ansible.builtin.shell: ufw allow 22/tcp comment 'Allow SSH'
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    comment: 'Allow SSH'
 
 - name: Allow HTTP connections on port 80
-  ansible.builtin.shell: ufw allow 80/tcp comment 'Allow HTTP API'
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'Allow HTTP API'
 
-- name: Enabled firewall ufw
-  ansible.builtin.shell: ufw --force enable
-  
+- name: Enable firewall ufw
+  become: true
+  community.general.ufw:
+    state: enabled
+    policy: allow
