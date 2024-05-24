@@ -2,6 +2,7 @@
   hosts: quality-control
   become: true
   roles:
+    - apt
     - postgre
     - kernel_tune
     - sonarqube

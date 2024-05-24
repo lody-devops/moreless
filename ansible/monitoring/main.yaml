@@ -2,6 +2,7 @@
   hosts: monitoring
   become: true
   roles:
+    - apt
     - nagios
     - common_nrpe_server
     - prometheus

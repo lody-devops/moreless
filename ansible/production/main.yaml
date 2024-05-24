@@ -2,12 +2,14 @@
   hosts: node-web
   become: true
   roles:
+    - apt
     - django
 
 - name: Playbook for Databases
   hosts: node-db
   become: true
   roles:
+    - apt
     - nginx
     - mysql
     - api

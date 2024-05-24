@@ -2,4 +2,5 @@
   hosts: agents-java
   become: true
   roles:
+    - apt
     - maven
