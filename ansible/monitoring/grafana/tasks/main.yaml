@@ -57,7 +57,7 @@
 
 - name: Create Nginx configuration for Grafana
   ansible.builtin.template:
-    src: "grafana.conf.j2"
+    src: "grafana_conf.j2"
     dest: "/etc/nginx/sites-available/grafana.conf"
     mode: "0644"
   notify: Restart Nginx
