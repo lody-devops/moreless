@@ -11,6 +11,7 @@ htpasswd_user: "nagiosadmin"
 htpasswd_file: "/usr/local/nagios/etc/htpasswd.users"
 htpasswd_password: "nagios"
 
+apache_modules_path: "/etc/apache2/mods-available"
 apache_nagios_conf_path: "/etc/apache2/sites-available/nagios.conf"
 nagios_sample_conf_path: "/usr/local/nagios/etc/sample-config/httpd.conf"
 nagios_sites_enabled: "/etc/apache2/sites-enabled/"
